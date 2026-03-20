@@ -31,6 +31,22 @@ let environmentURL: string;
 getEnvironmentURL().then((url: string) => (environmentURL = url));
 
 /**
+ * Strips wrapping <p> tags from HTML content while preserving inline formatting tags
+ * (e.g. <del>, <strong>, <em>). This allows inline HTML formatting to render correctly
+ * in system messages displayed via RenderHTML.
+ */
+function stripOuterParagraphTags(html: string): string {
+    if (!html) {
+        return '';
+    }
+    return html
+        .replace(/^<p>/i, '')
+        .replace(/<\/p>$/i, '')
+        .replace(/<\/p>\s*<p>/gi, '<br />')
+        .trim();
+}
+
+/**
  * Builds the partial message fragment for a modified field on the expense.
  */
 function buildMessageFragmentForValue(
@@ -222,8 +238,10 @@ function getRulesModifiedMessage(
             return translate('iou.rulesModifiedFields.common', key, getCommaSeparatedTagNameWithSanitizedColons(updatedValue), isFirst);
         }
         // The backend saves the description field as `comment` key, but we need to display it as `description` key.
+        // We preserve inline HTML formatting (bold, italic, strikethrough) instead of converting to markdown,
+        // since the rendering pipeline uses RenderHTML and will render these tags correctly.
         if (key === 'comment') {
-            return translate('iou.rulesModifiedFields.common', 'description', Parser.htmlToMarkdown(updatedValue), isFirst);
+            return translate('iou.rulesModifiedFields.common', 'description', stripOuterParagraphTags(updatedValue), isFirst);
         }
 
         return translate('iou.rulesModifiedFields.common', key, updatedValue, isFirst);
@@ -315,8 +333,8 @@ function getForReportAction({
 
         buildMessageFragmentForValue(
             translate,
-            Parser.htmlToMarkdown(reportActionOriginalMessage?.newComment ?? ''),
-            Parser.htmlToMarkdown(reportActionOriginalMessage?.oldComment ?? ''),
+            stripOuterParagraphTags(reportActionOriginalMessage?.newComment ?? ''),
+            stripOuterParagraphTags(reportActionOriginalMessage?.oldComment ?? ''),
             descriptionLabel,
             true,
             setFragments,
